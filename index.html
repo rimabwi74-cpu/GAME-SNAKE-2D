@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>Snake Game 50 Levels + Login</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body {
+      background-color: #1a1a1a;
+      color: #fff;
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      padding: 10px;
+    }
+
+    /* Screen Views */
+    .screen { display: none; flex-direction: column; align-items: center; width: 100%; max-width: 400px; }
+    .active-screen { display: flex; }
+
+    /* Auth Box */
+    .auth-card {
+      background: #222;
+      border: 1px solid #4CAF50;
+      padding: 25px;
+      border-radius: 12px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
+    }
+    .auth-card h2 { margin-bottom: 15px; color: #4CAF50; }
+    .auth-card input {
+      width: 100%;
+      padding: 12px;
+      margin: 8px 0;
+      border-radius: 6px;
+      border: 1px solid #444;
+      background: #111;
+      color: white;
+      outline: none;
+    }
+    .auth-card button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 10px;
+      background: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+    .auth-card button.secondary { background: #555; }
+    .auth-toggle { margin-top: 15px; font-size: 14px; cursor: pointer; color: #81C784; text-decoration: underline; }
+
+    /* Game HUD & Area */
+    .hud {
+      display: flex;
+      justify-content: space-between;
+      width: 100%;
+      margin-bottom: 10px;
+      font-weight: bold;
+      font-size: 14px;
+      background: #2a2a2a;
+      padding: 10px;
+      border-radius: 8px;
+    }
+    canvas {
+      background-color: #000;
+      border: 3px solid #4CAF50;
+      border-radius: 8px;
+      box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
+      max-width: 100%;
+      height: auto;
+    }
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, 60px);
+      grid-template-rows: repeat(3, 60px);
+      gap: 5px;
+      margin-top: 15px;
+    }
+    .btn {
+      background: #333;
+      border: 2px solid #555;
+      color: white;
+      font-size: 20px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .btn:active { background: #555; }
+    #btn-up { grid-column: 2; grid-row: 1; }
+    #btn-left { grid-column: 1; grid-row: 2; }
+    #btn-right { grid-column: 3; grid-row: 2; }
+    #btn-down { grid-column: 2; grid-row: 3; }
+
+    /* Modal GameOver */
+    .modal {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; width: 100%; height: 100%;
+      background: rgba(0,0,0,0.85);
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      padding: 20px;
+      z-index: 10;
+    }
+    .modal-content {
+      background: #222;
+      padding: 20px;
+      border-radius: 10px;
+      text-align: center;
+      max-width: 350px;
+      width: 100%;
+      border: 1px solid #4CAF50;
+    }
+    table { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: 14px; }
+    th, td { padding: 6px; border-bottom: 1px solid #444; text-align: left; }
+    th { color: #4CAF50; }
+  </style>
+</head>
+<body>
+
+<!-- SCREEN LOGIN / REGISTER -->
+<div id="auth-screen" class="screen active-screen">
+  <div class="auth-card">
+    <h2 id="auth-title">Login Pemain</h2>
+    <input type="text" id="auth-username" placeholder="Username" maxlength="12">
+    <input type="password" id="auth-password" placeholder="Password">
+    <button id="auth-btn" onclick="handleAuth()">Masuk</button>
+    <div class="auth-toggle" onclick="toggleAuthMode()" id="auth-toggle-text">Belum punya akun? Daftar disini</div>
+  </div>
+</div>
+
+<!-- SCREEN GAME -->
+<div id="game-screen" class="screen">
+  <div class="hud">
+    <span>User: <b id="user-display" style="color:#4CAF50;">-</b></span>
+    <span>Lvl: <span id="lvl-txt">1</span>/50</span>
+    <span>Skor: <span id="score-txt">0</span></span>
+  </div>
+  
+  <canvas id="gameCanvas" width="400" height="400"></canvas>
+
+  <div class="controls">
+    <div class="btn" id="btn-up">▲</div>
+    <div class="btn" id="btn-left">◄</div>
+    <div class="btn" id="btn-right">►</div>
+    <div class="btn" id="btn-down">▼</div>
+  </div>
+</div>
+
+<!-- MODAL GAME OVER & LEADERBOARD -->
+<div id="gameOverModal" class="modal">
+  <div class="modal-content">
+    <h2>Game Over!</h2>
+    <p>Skor Akhir: <span id="final-score">0</span></p>
+    <p>Level Tercapai: <span id="final-level">1</span></p>
+    
+    <h3 style="margin-top: 15px;">Leaderboard Top 10</h3>
+    <table>
+      <thead><tr><th>Nama</th><th>Skor</th><th>Lvl</th></tr></thead>
+      <tbody id="leaderboard-body">
+        <tr><td colspan="3">Memuat data...</td></tr>
+      </tbody>
+    </table>
+    <br>
+    <button class="auth-card button" onclick="restartGame()">Main Lagi</button>
+    <button class="auth-card button secondary" style="margin-top: 5px;" onclick="logout()">Keluar Akun</button>
+  </div>
+</div>
+
+<script>
+  // GANTI DENGAN URL APPS SCRIPT
+  const GOOGLE_SCRIPT_URL = "MASUKKAN_URL_WEB_APP_GOOGLE_APPS_SCRIPT_DISINI";
+
+  let currentUser = "";
+  let isRegisterMode = false;
+
+  // AUTH SYSTEM
+  function toggleAuthMode() {
+    isRegisterMode = !isRegisterMode;
+    document.getElementById("auth-title").innerText = isRegisterMode ? "Daftar Akun Baru" : "Login Pemain";
+    document.getElementById("auth-btn").innerText = isRegisterMode ? "Daftar" : "Masuk";
+    document.getElementById("auth-toggle-text").innerText = isRegisterMode ? "Sudah punya akun? Login disini" : "Belum punya akun? Daftar disini";
+  }
+
+  function handleAuth() {
+    const user = document.getElementById("auth-username").value.trim();
+    const pass = document.getElementById("auth-password").value.trim();
+
+    if (!user || !pass) { alert("Isi username dan password!"); return; }
+
+    const payload = {
+      action: isRegisterMode ? "register" : "login",
+      username: user,
+      password: pass
+    };
+
+    fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify(payload)
+    })
+    .then(res => res.json())
+    .then(data => {
+      alert(data.message);
+      if (data.status === "success") {
+        if (!isRegisterMode) {
+          currentUser = user;
+          document.getElementById("user-display").innerText = currentUser;
+          document.getElementById("auth-screen").classList.remove("active-screen");
+          document.getElementById("game-screen").classList.add("active-screen");
+          initGame();
+        } else {
+          toggleAuthMode();
+        }
+      }
+    })
+    .catch(() => alert("Gagal terhubung ke server!"));
+  }
+
+  function logout() {
+    currentUser = "";
+    document.getElementById("gameOverModal").style.display = "none";
+    document.getElementById("game-screen").classList.remove("active-screen");
+    document.getElementById("auth-screen").classList.add("active-screen");
+  }
+
+  // GAME ENGINE
+  const canvas = document.getElementById("gameCanvas");
+  const ctx = canvas.getContext("2d");
+  const gridSize = 20;
+  const tileCount = canvas.width / gridSize;
+
+  let snake, food, dx, dy, score, level, foodEatenInLvl, gameInterval, isGameOver;
+
+  function getLevelSpeed(lvl) { return Math.max(40, 150 - (lvl * 2.2)); }
+  function getTargetFood(lvl) { return 4 + lvl; }
+
+  function initGame() {
+    snake = [{ x: 10 * gridSize, y: 10 * gridSize }, { x: 9 * gridSize, y: 10 * gridSize }];
+    dx = gridSize; dy = 0; score = 0; level = 1; foodEatenInLvl = 0; isGameOver = false;
+    updateHUD();
+    spawnFood();
+    clearInterval(gameInterval);
+    gameInterval = setInterval(gameLoop, getLevelSpeed(level));
+  }
+
+  function gameLoop() {
+    if (isGameOver) return;
+    moveSnake();
+    if (checkCollision()) { handleGameOver(); return; }
+    draw();
+  }
+
+  function moveSnake() {
+    const head = { x: snake[0].x + dx, y: snake[0].y + dy };
+    snake.unshift(head);
+
+    if (head.x === food.x && head.y === food.y) {
+      score += 10 * level;
+      foodEatenInLvl++;
+      if (foodEatenInLvl >= getTargetFood(level) && level < 50) {
+        level++;
+        foodEatenInLvl = 0;
+        clearInterval(gameInterval);
+        gameInterval = setInterval(gameLoop, getLevelSpeed(level));
+      }
+      updateHUD();
+      spawnFood();
+    } else {
+      snake.pop();
+    }
+  }
+
+  function spawnFood() {
+    food = {
+      x: Math.floor(Math.random() * tileCount) * gridSize,
+      y: Math.floor(Math.random() * tileCount) * gridSize
+    };
+    snake.forEach(part => { if (part.x === food.x && part.y === food.y) spawnFood(); });
+  }
+
+  function checkCollision() {
+    const head = snake[0];
+    if (head.x < 0 || head.x >= canvas.width || head.y < 0 || head.y >= canvas.height) return true;
+    for (let i = 1; i < snake.length; i++) {
+      if (head.x === snake[i].x && head.y === snake[i].y) return true;
+    }
+    return false;
+  }
+
+  function draw() {
+    ctx.fillStyle = "#111";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    snake.forEach((part, i) => {
+      ctx.fillStyle = i === 0 ? "#4CAF50" : "#81C784";
+      ctx.fillRect(part.x, part.y, gridSize - 1, gridSize - 1);
+    });
+    ctx.fillStyle = "#FF5252";
+    ctx.fillRect(food.x, food.y, gridSize - 1, gridSize - 1);
+  }
+
+  function updateHUD() {
+    document.getElementById("lvl-txt").innerText = level;
+    document.getElementById("score-txt").innerText = score;
+  }
+
+  function handleGameOver() {
+    isGameOver = true;
+    clearInterval(gameInterval);
+    document.getElementById("final-score").innerText = score;
+    document.getElementById("final-level").innerText = level;
+    document.getElementById("gameOverModal").style.display = "flex";
+    
+    // Auto-submit Skor
+    fetch(GOOGLE_SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({ action: "submitScore", username: currentUser, skor: score, level: level })
+    }).then(() => fetchLeaderboard());
+  }
+
+  function restartGame() {
+    document.getElementById("gameOverModal").style.display = "none";
+    initGame();
+  }
+
+  function fetchLeaderboard() {
+    const tbody = document.getElementById("leaderboard-body");
+    tbody.innerHTML = "<tr><td colspan='3'>Memuat...</td></tr>";
+    fetch(GOOGLE_SCRIPT_URL + "?action=getLeaderboard")
+      .then(res => res.json())
+      .then(data => {
+        tbody.innerHTML = "";
+        data.forEach(row => {
+          tbody.innerHTML += `<tr><td>${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td></tr>`;
+        });
+      });
+  }
+
+  // KONTROL
+  function changeDirection(dir) {
+    if (dir === 'UP' && dy === 0) { dx = 0; dy = -gridSize; }
+    if (dir === 'DOWN' && dy === 0) { dx = 0; dy = gridSize; }
+    if (dir === 'LEFT' && dx === 0) { dx = -gridSize; dy = 0; }
+    if (dir === 'RIGHT' && dx === 0) { dx = gridSize; dy = 0; }
+  }
+
+  document.addEventListener("keydown", e => {
+    if (e.key === "ArrowUp") changeDirection('UP');
+    if (e.key === "ArrowDown") changeDirection('DOWN');
+    if (e.key === "ArrowLeft") changeDirection('LEFT');
+    if (e.key === "ArrowRight") changeDirection('RIGHT');
+  });
+
+  document.getElementById("btn-up").addEventListener("click", () => changeDirection('UP'));
+  document.getElementById("btn-down").addEventListener("click", () => changeDirection('DOWN'));
+  document.getElementById("btn-left").addEventListener("click", () => changeDirection('LEFT'));
+  document.getElementById("btn-right").addEventListener("click", () => changeDirection('RIGHT'));
+</script>
+</body>
+</html>
