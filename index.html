@@ -60,6 +60,7 @@
       font-weight: bold;
       cursor: pointer;
     }
+    .auth-card button:disabled { background: #666; cursor: not-allowed; }
     .auth-card button.secondary { background: #555; }
     .auth-toggle { margin-top: 15px; font-size: 14px; cursor: pointer; color: #81C784; text-decoration: underline; }
 
@@ -185,7 +186,7 @@
 </div>
 
 <script>
-  // GANTI DENGAN URL APPS SCRIPT
+  // MASUKKAN URL GOOGLE APPS SCRIPT HASIL DEPLOY BARU KAMU DI SINI
   const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwvnzRc1BD_QdSDpZjUaIBYRZ1eckvYLOuvGhMk988NG2tin2I9EFuDx0KAJ1J_yegUcw/exec";
 
   let currentUser = "";
@@ -202,8 +203,15 @@
   function handleAuth() {
     const user = document.getElementById("auth-username").value.trim();
     const pass = document.getElementById("auth-password").value.trim();
+    const authBtn = document.getElementById("auth-btn");
 
-    if (!user || !pass) { alert("Isi username dan password!"); return; }
+    if (!user || !pass) { 
+      alert("Isi username dan password!"); 
+      return; 
+    }
+
+    authBtn.innerText = "Proses...";
+    authBtn.disabled = true;
 
     const payload = {
       action: isRegisterMode ? "register" : "login",
@@ -211,8 +219,10 @@
       password: pass
     };
 
+    // Menggunakan text/plain untuk menghindari masalah CORS preflight
     fetch(GOOGLE_SCRIPT_URL, {
       method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
     })
     .then(res => res.json())
@@ -230,11 +240,20 @@
         }
       }
     })
-    .catch(() => alert("Gagal terhubung ke server!"));
+    .catch(err => {
+      console.error(err);
+      alert("Gagal terhubung ke server! Pastikan URL Google Apps Script sudah benar dan hak akses set ke 'Anyone'.");
+    })
+    .finally(() => {
+      authBtn.innerText = isRegisterMode ? "Daftar" : "Masuk";
+      authBtn.disabled = false;
+    });
   }
 
   function logout() {
     currentUser = "";
+    document.getElementById("auth-username").value = "";
+    document.getElementById("auth-password").value = "";
     document.getElementById("gameOverModal").style.display = "none";
     document.getElementById("game-screen").classList.remove("active-screen");
     document.getElementById("auth-screen").classList.add("active-screen");
@@ -330,6 +349,7 @@
     // Auto-submit Skor
     fetch(GOOGLE_SCRIPT_URL, {
       method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify({ action: "submitScore", username: currentUser, skor: score, level: level })
     }).then(() => fetchLeaderboard());
   }
@@ -349,6 +369,9 @@
         data.forEach(row => {
           tbody.innerHTML += `<tr><td>${row[0]}</td><td>${row[1]}</td><td>${row[2]}</td></tr>`;
         });
+      })
+      .catch(() => {
+        tbody.innerHTML = "<tr><td colspan='3'>Gagal memuat leaderboard</td></tr>";
       });
   }
 
